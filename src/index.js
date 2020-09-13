@@ -1,9 +1,113 @@
-var http = require("http");
+/***********************************
+ * Module dependencies.
+ ************************************/
+var express = require("express");
+var path = require("path");
+var bodyParser = require("body-parser");
+var exphbs = require("express-handlebars");
+var session = require("express-session");
+var flash = require("connect-flash");
+var config = require("../config/index");
+var Logger = require("../lib/logger");
 
-//create a server object:
-http
-  .createServer(function(req, res) {
-    res.write("Hello World!"); //write a response to the client
-    res.end(); //end the response
-  })
-  .listen(8080); //the server object listens on port 8080
+//routes
+var indexRouter = require("../routes/index");
+
+/***********************************
+ * App creation
+ ************************************/
+var app = express();
+
+/***********************************
+ * Templating
+ ************************************/
+var hbs = exphbs.create({
+  defaultLayout: "master",
+  extname: ".handlebars",
+  layoutsDir: "views/layouts",
+  partialsDir: "views/partials"
+});
+
+app.engine("handlebars", hbs.engine);
+
+/***********************************
+ * Set up app properties & engine
+ ************************************/
+var sess = {
+  secret: config.secret,
+  cookie: {},
+  resave: false,
+  saveUninitialized: true
+};
+
+app.use(session(sess));
+app.use(function (req, res, next) {
+  res.locals.session = req.session;
+  next();
+});
+
+app.use(express.static(path.join("client")));
+app.set("view engine", ".handlebars");
+app.set("views", path.join(__dirname, "../views"));
+app.use(Logger.getRequestLogger());
+
+app.use(flash());
+
+/***********************************
+ * auth message failure
+ ************************************/
+app.use(function (req, res, next) {
+  if (req && req.query && req.query.error) {
+    req.flash("error", req.query.error);
+  }
+  if (req && req.query && req.query.error_description) {
+    req.flash("error_description", req.query.error_description);
+  }
+  next();
+});
+
+/***********************************
+ * Routes
+ ************************************/
+
+// for parsing application/json
+app.use(bodyParser.json());
+// for parsing application/xwww-
+app.use(bodyParser.urlencoded({ extended: true }));
+
+app.use("/", indexRouter);
+
+/***********************************
+ * Error handling
+ ************************************/
+// Catch 404 and forward to error handler
+app.use(function (req, res, next) {
+  var err = new Error("Not Found");
+  err.status = 404;
+  next(err);
+});
+
+// Error handlers
+app.use(function (err, req, res, next) {
+  res.status(err.status || 500);
+  res.render("error", {
+    message: err.message,
+    error: {}
+  });
+});
+
+/***********************************
+ * Start server
+ ************************************/
+
+var server = app.listen(config.port, function () {
+  var host = server.address().address;
+  var port = server.address().port;
+
+  console.log("Datavillage sample app listening at http://%s:%s", host, port);
+});
+
+/***********************************
+ * Module exports.
+ ************************************/
+module.exports = app;
