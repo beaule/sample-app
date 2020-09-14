@@ -1,7 +1,7 @@
 {
-  "name": "sample-app",
+  "name": "datavillage-sample-app",
   "version": "1.0.0",
-  "description": "Datavillage sample app",
+  "description": "Create your first privacy by design app.",
   "main": "src/index.js",
   "scripts": {
     "start": "nodemon src/index.js"
@@ -25,7 +25,8 @@
     "express-validator": "^5.3.0",
     "express-winston-middleware": "^0.1.0",
     "winston": "^2.2.0",
-    "http-errors": "~1.6.2"
+    "http-errors": "~1.6.2",
+    "axios": "^0.20.0"
   },
   "keywords": []
 }
