@@ -7,80 +7,59 @@
  ************************************/
 var express = require("express");
 var router = express.Router();
-import Consent from "../server/lib/utils/consent";
-import request from "request";
+var Session = require("../lib/session.js");
+var Authorization = require("../lib/api/authorization.js");
+var Consents = require("../lib/api/consents.js");
+var Cages = require("../lib/api/cages.js");
 
-/* POST generate privacy center widget */
-router.get("/auth/demo/privacyCenter/createWidget", function (req, res, next) {
-  var consentReceiptSelected = req.session.workbenchConsentReceiptSelected;
-  Consent.getConsentReceiptChain(
-    req.session.applicationAccessToken,
-    consentReceiptSelected,
-    null,
-    function (consentReceipt) {
-      if (consentReceipt != null) {
-        renderPrivacyCenterWidget(
-          req,
-          res,
-          consentReceiptSelected,
-          consentReceipt
-        );
-      } else renderPrivacyCenterWidget(req, res, consentReceiptSelected);
-    }
-  );
+/* get home */
+router.get("/", function (req, res, next) {
+  //get consent user access token from refresh token if any
+  Session.getUserRefreshToken(function (userRefreshToken) {
+    if (userRefreshToken != null) {
+      Authorization.refreshUserAccessToken(
+        process.env.CLIENT_ID,
+        process.env.CLIENT_SECRET,
+        Consents.ROOT_PATH_CONSENT_RECEIPT + process.env.CONSENT_RECEIPT_ID,
+        userRefreshToken,
+        function (response) {
+          //store access token in session
+          Session.setUserAccessToken(req, response.access_token);
+          //store refresh token in file
+          Session.storeUserRefreshToken(response.refresh_token);
+          renderHome(req, res);
+        }
+      );
+    } else renderHome(req, res);
+  });
 });
 
-/* GET generate privacy center widget */
-router.get("/auth/workbench/privacyCenter/createWidgetCallback", function (
-  req,
-  res,
-  next
-) {
-  var consentReceiptSelected = req.session.workbenchConsentReceiptSelected;
-  //get authorization code
+/* Authorize callback and Import data*/
+router.get("/callback", function (req, res, next) {
   var code = req.query.code;
   if (code != null) {
-    //get token
-    Authentication.getUserTokensFromCode(
-      req,
-      req.session.clientId,
-      req.session.clientSecret,
+    //get consent user access token from code
+    Authorization.getUserAccessToken(
+      process.env.CLIENT_ID,
+      process.env.CLIENT_SECRET,
       code,
       function (response) {
         if (response != null) {
           //store access token in session
-          var applicationUser = Authentication.setApplicationUser(
-            req,
-            response
-          );
-
-          Consent.getConsentReceiptChain(
-            req.session.applicationAccessToken,
-            consentReceiptSelected,
-            null,
-            function (consentReceipt) {
-              if (consentReceipt != null) {
-                //store in session for second call to show the graph
-                req.session.privacyCenterConsentReceipt = consentReceipt;
-                Consent.getConsentsChain(
-                  req.session.applicationAccessToken,
-                  consentReceiptSelected,
-                  applicationUser[consentReceiptSelected].user_id,
-                  req.session.clientId,
-                  function (consents) {
-                    renderPrivacyCenterWidget(
-                      req,
-                      res,
-                      consentReceiptSelected,
-                      consentReceipt,
-                      consents,
-                      true,
-                      applicationUser[consentReceiptSelected].user_id
-                    );
-                  }
-                );
+          Session.setUserAccessToken(req, response.access_token);
+          //store refresh token in file
+          Session.storeUserRefreshToken(response.refresh_token);
+          //import personal data into the personal data store
+          Cages.importData(
+            Session.getUserAccessToken(req),
+            process.env.CONSENT_RECEIPT_ID,
+            process.env.IMPORT_START_DATE,
+            process.env.IMPORT_END_DATE,
+            function (response) {
+              if (response != null) {
+                renderHome(req, res);
               } else
-                renderPrivacyCenterWidget(req, res, consentReceiptSelected);
+                renderError(req, res, "Error occur during import data flow");
             }
           );
         } else renderError(req, res, "Error occur during authorization flow");
@@ -89,7 +68,49 @@ router.get("/auth/workbench/privacyCenter/createWidgetCallback", function (
   } else renderError(req, res, "Error occur during authorization flow");
 });
 
-/* GET generate graph data sources for privacy center widget */
-router.get("/auth/workbench/privacyCenter/graph", function (req, res, next) {
-  renderPrivacyCenterGraph(req, res, req.session.privacyCenterConsentReceipt);
+/* Load data */
+router.get("/loadAndEnrich", function (req, res, next) {
+  //Load data from the personal data store into the data cage (confidenital graph engine)
+  Cages.loadData(
+    Session.getUserAccessToken(req),
+    process.env.CONSENT_RECEIPT_ID,
+    function (response) {
+      if (response != null) {
+        renderHome(req, res);
+      } else
+        renderError(req, res, "Error occur during load data and enrich flow");
+    }
+  );
 });
+
+/**
+ * render  home
+ * @param {req} request
+ * @param {res} response
+ */
+function renderHome(req, res) {
+  res.render("home", {
+    layout: "master",
+    actionActivateConsent: Authorization.authorize(
+      process.env.CLIENT_ID,
+      process.env.APP_URL + "callback",
+      Consents.ROOT_PATH_CONSENT_RECEIPT + process.env.CONSENT_RECEIPT_ID
+    ),
+    actionRevokeConsent: Authorization.deAuthorize()
+  });
+}
+
+/**
+ * render error
+ * @param {req} request
+ * @param {res} response
+ */
+function renderError(req, res, error) {
+  res.render("error", {
+    layout: "master",
+    title: "Error",
+    message: error
+  });
+}
+
+module.exports = router;

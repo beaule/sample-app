@@ -7,8 +7,8 @@ var bodyParser = require("body-parser");
 var exphbs = require("express-handlebars");
 var session = require("express-session");
 var flash = require("connect-flash");
-var config = require("../config/index");
 var Logger = require("../lib/logger");
+var dotenv = require("dotenv");
 
 //routes
 var indexRouter = require("../routes/index");
@@ -17,6 +17,7 @@ var indexRouter = require("../routes/index");
  * App creation
  ************************************/
 var app = express();
+dotenv.load();
 
 /***********************************
  * Templating
@@ -34,7 +35,7 @@ app.engine("handlebars", hbs.engine);
  * Set up app properties & engine
  ************************************/
 var sess = {
-  secret: config.secret,
+  secret: "demo",
   cookie: {},
   resave: false,
   saveUninitialized: true
@@ -100,7 +101,7 @@ app.use(function (err, req, res, next) {
  * Start server
  ************************************/
 
-var server = app.listen(config.port, function () {
+var server = app.listen("8080", function () {
   var host = server.address().address;
   var port = server.address().port;
 

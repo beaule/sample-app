@@ -5,3 +5,22 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.4.1/jquery.easing.min.js"></script>
 <!-- Core theme JS-->
 <script src="js/scripts.js"></script>
+<script>
+  function copyToClipboard(id) {
+    /* Get the text field */
+    var copyText = document.getElementById(id);
+    var changeType = false;
+    if (copyText.type == "password") {
+      changeType = true;
+      copyText.type = "text;"
+    }
+
+    /* Select the text field */
+    copyText.select();
+    copyText.setSelectionRange(0, 99999); /*For mobile devices*/
+    /* Copy the text inside the text field */
+    document.execCommand("copy");
+    if (changeType)
+      copyText.type = "password"
+  }
+</script>
