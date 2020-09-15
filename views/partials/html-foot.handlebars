@@ -23,4 +23,32 @@
     if (changeType)
       copyText.type = "password"
   }
+  function queryDigitalProfile(endPoint) {
+    $.ajax({
+      url: '/' + endPoint + "DigitalTwin",
+      type: 'GET',
+      dataType: "json",
+      success: function (response, statut) {
+        $("#" + endPoint + "Response").text(JSON.stringify(response, undefined, 4));
+      },
+      error: function (resultat, statut, erreur) {
+        alert(statut + " " + resultat + " " + erreur)
+      },
+      complete: function (resultat, statut) {
+        //empty
+      }
+    });
+  }
+
+  $(document).ready(function () {
+    // On reprend le même id que dans le précédent chapitre
+
+    $("#simpleQuery").click(function () {
+      queryDigitalProfile("simpleQuery");
+    });
+
+    $("#advancedQuery").click(function () {
+      queryDigitalProfile("advancedQuery");
+    });
+  });
 </script>
