@@ -23,10 +23,17 @@ router.get("/", function (req, res, next) {
         Consents.ROOT_PATH_CONSENT_RECEIPT + process.env.CONSENT_RECEIPT_ID,
         userRefreshToken,
         function (response) {
-          //store access token in session
-          Session.setUserAccessToken(req, response.access_token);
-          //store refresh token in file
-          Session.storeUserRefreshToken(response.refresh_token);
+          if (response != null) {
+            //store access token in session
+            Session.setUserAccessToken(req, response.access_token);
+            //store refresh token in file
+            Session.storeUserRefreshToken(response.refresh_token);
+          } else {
+            //set access token in session to null
+            Session.setUserAccessToken(req, null);
+            //remove refresh token from file
+            Session.deleteUserRefreshToken();
+          }
           renderHome(req, res);
         }
       );
@@ -76,11 +83,65 @@ router.get("/loadAndEnrich", function (req, res, next) {
     process.env.CONSENT_RECEIPT_ID,
     function (response) {
       if (response != null) {
-        renderHome(req, res);
+        //apply enrichment on the graph if needed
+        //example apply temporal enrichment
+        Cages.applyTemporalEnrichment(
+          Session.getUserAccessToken(req),
+          function (response) {
+            if (response != null) {
+              renderHome(req, res);
+            } else
+              renderError(
+                req,
+                res,
+                "Error occur during temporal enrichment flow"
+              );
+          }
+        );
       } else
         renderError(req, res, "Error occur during load data and enrich flow");
     }
   );
+});
+
+/* simple query digital twin  */
+router.get("/simpleQueryDigitalTwin", function (req, res, next) {
+  //query digital twin into the data cage (confidenital graph engine)
+  var query = {
+    query:
+      "{  Person  {    uri     actions    {      uri      type      description      distance      startTime      {        year        month        day        hour        minute        second        formatted      }      endTime      {        year        month        day        hour        minute        second        formatted      }      physicalActivity      {        uri        category        additionalType      }    }  }}",
+    variables: {}
+  };
+
+  Cages.queryDigitalTwin(Session.getUserAccessToken(req), query, function (
+    response
+  ) {
+    if (response != null) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(response.data));
+    } else res.writeHead(401, { "Content-Type": "application/json" });
+    res.end("Error occur during query digital twin flow");
+  });
+});
+
+/* advanced query digital twin  */
+router.get("/advancedQueryDigitalTwin", function (req, res, next) {
+  //query digital twin into the data cage (confidenital graph engine)
+  var query = {
+    query:
+      '{  Person  {    uri     actions (filter: {startTime_lt: { year: 2020 } physicalActivity:{category: "Running"}})    {      description      distance      startTime       {        year      }      physicalActivity       {        category      }    }  }}',
+    variables: {}
+  };
+
+  Cages.queryDigitalTwin(Session.getUserAccessToken(req), query, function (
+    response
+  ) {
+    if (response != null) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(response.data));
+    } else res.writeHead(401, { "Content-Type": "application/json" });
+    res.end("Error occur during query digital twin flow");
+  });
 });
 
 /**
