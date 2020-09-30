@@ -52,6 +52,7 @@ router.get("/callback", function (req, res, next) {
       code,
       function (response) {
         if (response != null) {
+          console.log("*****");
           //store access token in session
           Session.setUserAccessToken(req, response.access_token);
           //store refresh token in file
@@ -76,28 +77,14 @@ router.get("/callback", function (req, res, next) {
 });
 
 /* Load data */
-router.get("/loadAndEnrich", function (req, res, next) {
+router.get("/load", function (req, res, next) {
   //Load data from the personal data store into the data cage (confidenital graph engine)
   Cages.loadData(
     Session.getUserAccessToken(req),
     process.env.CONSENT_RECEIPT_ID,
     function (response) {
       if (response != null) {
-        //apply enrichment on the graph if needed
-        //example apply temporal enrichment
-        Cages.applyTemporalEnrichment(
-          Session.getUserAccessToken(req),
-          function (response) {
-            if (response != null) {
-              renderHome(req, res);
-            } else
-              renderError(
-                req,
-                res,
-                "Error occur during temporal enrichment flow"
-              );
-          }
-        );
+        renderHome(req, res);
       } else
         renderError(req, res, "Error occur during load data and enrich flow");
     }
